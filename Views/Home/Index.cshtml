@@ -7,7 +7,21 @@
     <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
 </div>
 <br/>
-<div>
-    <a class="btn btn-primary" asp-action="ExportarExcel">Download Excel</a>
-</div>
+
+<form asp-controller="Home">
+    <div class="row">
+        <div class="col-md-2">
+            <a asp-action="ExportarExcelComClosedXML" class=" btn btn-primary">Download .xlsx com ClosedXML</a>
+        </div>
+
+        <div class="col-md-2">
+            <a asp-action="ExportarExcelNpoi" asp-route-extensao=".xlsx" class="btn btn-primary">Download .xlsx com NPOI</a>
+        </div>
+
+        <div class="col-md-2">
+            <a asp-action="ExportarExcelNpoi" asp-route-extensao=".xls" class="btn btn-primary">Download .xls com NPOI</a>
+        </div>
+    </div>
+</form>
+
 

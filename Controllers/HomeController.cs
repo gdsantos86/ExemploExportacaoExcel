@@ -1,12 +1,16 @@
-using ClosedXML.Excel;
 using ExemploExportacaoExcel.Data;
 using ExemploExportacaoExcel.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.FileProviders;
 using System.Data;
 using System.Diagnostics;
+
+using ClosedXML.Excel;
+using NPOI.SS.UserModel;
+using NPOI.HSSF.UserModel;
+using NPOI.XSSF.UserModel;
+
+
 
 namespace ExemploExportacaoExcel.Controllers
 {
@@ -38,7 +42,7 @@ namespace ExemploExportacaoExcel.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> ExportarExcel()
+        public async Task<IActionResult> ExportarExcelComClosedXML()
         {
             var clientes = await _context.Clientes.ToListAsync();
             if (clientes == null)
@@ -47,32 +51,28 @@ namespace ExemploExportacaoExcel.Controllers
             }
             var nomeArquivo = "clientes.xlsx";
 
-            var arquivo =  GeraExcel(nomeArquivo, clientes);
-            
-            if(arquivo == null) 
-            { 
-                return NotFound("O arquivo não foi gerado."); 
+            return GeraExcelComClosedXML(nomeArquivo, clientes);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ExportarExcelNpoi(string extensao)
+        {
+            var clientes = await _context.Clientes.ToListAsync();
+            if (clientes == null)
+            {
+                return NotFound();
             }
-            
-            return GeraExcel(nomeArquivo, clientes);
+            var nomeArquivo = $"clientes{extensao}";
+
+            var arquivo = GeraExcelComNpoi(nomeArquivo, extensao, clientes);
+
+            return arquivo;
         }
 
 
-        private FileResult GeraExcel(string nomeArquivo, IEnumerable<Cliente> clientes)
+        private FileResult GeraExcelComClosedXML(string nomeArquivo, IEnumerable<Cliente> clientes)
         {
-            DataTable dataTable = new DataTable("Clientes");
-            dataTable.Columns.AddRange(new DataColumn[]
-            {
-                new DataColumn("Id"),
-                new DataColumn("Nome"),
-                new DataColumn("Idade"),
-                new DataColumn("Endereco"),
-            });
-
-            foreach (var cliente in clientes)
-            {
-                dataTable.Rows.Add(cliente.Id, cliente.Nome, cliente.Idade, cliente.Endereco);
-            }
+            var dataTable = GetDataTable(clientes);
 
             using (XLWorkbook wb = new XLWorkbook())
             {
@@ -88,5 +88,66 @@ namespace ExemploExportacaoExcel.Controllers
                 }
             }
         }
+
+        private FileResult GeraExcelComNpoi(string nomeArquivo, string extensao, IEnumerable<Cliente> clientes)
+        {
+            var dataTable = GetDataTable(clientes);
+
+            using (MemoryStream stream = new MemoryStream())
+            {
+                
+                IWorkbook wb = extensao == ".xls" ? new HSSFWorkbook() : new XSSFWorkbook();
+                ISheet ws = wb.CreateSheet("Clientes");
+
+                IRow headerRow = ws.CreateRow(0);
+                for (int i = 0; i < dataTable.Columns.Count; i++)
+                {
+                    ICell headerCell = headerRow.CreateCell(i);
+                    headerCell.SetCellValue(dataTable.Columns[i].ColumnName);
+                }
+
+                for (int i = 0; i < dataTable.Rows.Count; i++)
+                {
+                    IRow row = ws.CreateRow(i + 1);
+                    for (int j = 0; j < dataTable.Columns.Count; j++)
+                    {
+
+                        ICell cell = row.CreateCell(j);
+                        String columnName = dataTable.Columns[j].ToString();
+                        cell.SetCellValue(dataTable.Rows[i][columnName].ToString());
+                    }
+                }
+
+                wb.Write(stream);
+                var contentType = extensao == ".xls" 
+                    ? "application/vnd.ms-excel" 
+                    : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                
+                return File(stream.ToArray(), contentType, nomeArquivo);
+            }
+        }
+
+
+        private DataTable GetDataTable(IEnumerable<Cliente> clientes)
+        {
+            DataTable dataTable = new("Clientes");
+            dataTable.Columns.AddRange(
+            [
+                new DataColumn("Id"),
+                new DataColumn("Nome"),
+                new DataColumn("Idade"),
+                new DataColumn("Endereco"),
+            ]);
+
+            foreach (var cliente in clientes)
+            {
+                dataTable.Rows.Add(cliente.Id, cliente.Nome, cliente.Idade, cliente.Endereco);
+            }
+
+            return dataTable;
+        }
+
+
+
     }
 }
